@@ -48,6 +48,10 @@ class ExchangeCollector:
                 bid_price = float(bids[0][0]) if bids else None
                 ask_price = float(asks[0][0]) if asks else None
 
+                if bid_price is None or ask_price is None:
+                    logger.warning("Missing bid/ask for %s on Upbit, skipping", symbol)
+                    continue
+
                 # Parse timestamp
                 dt_str = ticker.get("datetime")
                 if dt_str:
@@ -97,12 +101,19 @@ class ExchangeCollector:
                 else:
                     ts = datetime.now(timezone.utc)
 
+                bid_price = float(ticker["bid"]) if ticker.get("bid") is not None else None
+                ask_price = float(ticker["ask"]) if ticker.get("ask") is not None else None
+
+                if bid_price is None or ask_price is None:
+                    logger.warning("Missing bid/ask for %s on Binance, skipping", symbol)
+                    continue
+
                 base = symbol.split("/")[0]
                 results.append({
                     "exchange": "binance",
                     "symbol": base,
-                    "bid_price": float(ticker["bid"]) if ticker.get("bid") is not None else None,
-                    "ask_price": float(ticker["ask"]) if ticker.get("ask") is not None else None,
+                    "bid_price": bid_price,
+                    "ask_price": ask_price,
                     "last_price": float(ticker["last"]) if ticker.get("last") is not None else None,
                     "volume_24h": float(ticker["quoteVolume"]) if ticker.get("quoteVolume") is not None else None,
                     "timestamp": ts,

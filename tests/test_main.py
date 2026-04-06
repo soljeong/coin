@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from main import run_loop, CLEANUP_INTERVAL
+from main import run_loop
+from config.settings import CLEANUP_INTERVAL
 
 
 def _make_tickers():

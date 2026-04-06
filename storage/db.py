@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from config.settings import RETENTION_DAYS_TICKERS, RETENTION_DAYS_OPPORTUNITIES
 
@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS tickers (
     symbol TEXT NOT NULL,
     bid_price REAL NOT NULL,
     ask_price REAL NOT NULL,
+    last_price REAL,
     volume_24h REAL,
     timestamp DATETIME NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -58,6 +59,7 @@ def insert_tickers(conn: sqlite3.Connection, tickers: list) -> None:
             t["symbol"],
             t["bid_price"],
             t["ask_price"],
+            t.get("last_price"),
             t.get("volume_24h"),
             t["timestamp"].isoformat() if isinstance(t["timestamp"], datetime) else t["timestamp"],
         )
@@ -65,8 +67,8 @@ def insert_tickers(conn: sqlite3.Connection, tickers: list) -> None:
     ]
     conn.executemany(
         """
-        INSERT INTO tickers (exchange, symbol, bid_price, ask_price, volume_24h, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO tickers (exchange, symbol, bid_price, ask_price, last_price, volume_24h, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )
@@ -76,7 +78,7 @@ def insert_tickers(conn: sqlite3.Connection, tickers: list) -> None:
 def cleanup_old_data(conn: sqlite3.Connection) -> None:
     """Delete tickers older than RETENTION_DAYS_TICKERS days and
     opportunities older than RETENTION_DAYS_OPPORTUNITIES days."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ticker_cutoff = (now - timedelta(days=RETENTION_DAYS_TICKERS)).isoformat()
     opp_cutoff = (now - timedelta(days=RETENTION_DAYS_OPPORTUNITIES)).isoformat()
 

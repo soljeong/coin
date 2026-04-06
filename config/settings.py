@@ -26,3 +26,6 @@ BINANCE_SYMBOLS = [f"{coin}/USDT" for coin in TARGET_COINS]
 # Data retention
 RETENTION_DAYS_TICKERS = 7
 RETENTION_DAYS_OPPORTUNITIES = 30
+
+# Cleanup interval in seconds (24 hours)
+CLEANUP_INTERVAL = 24 * 60 * 60

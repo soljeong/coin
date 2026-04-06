@@ -1,6 +1,6 @@
 """Tests for storage/db.py using in-memory SQLite."""
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from storage.db import init_db, insert_tickers, cleanup_old_data, get_latest_tickers
 
@@ -63,7 +63,7 @@ def test_init_db_idempotent():
 # --- insert_tickers ---
 
 def test_insert_tickers_stores_data(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     tickers = [
         make_ticker("upbit", "BTC", 135_000_000.0, 135_100_000.0, now),
         make_ticker("binance", "BTC", 92_000.0, 92_050.0, now, volume=1234.5),
@@ -75,7 +75,7 @@ def test_insert_tickers_stores_data(conn):
 
 
 def test_insert_tickers_field_values(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ticker = make_ticker("upbit", "ETH", 5_000_000.0, 5_010_000.0, now, volume=999.9)
     insert_tickers(conn, [ticker])
 
@@ -88,7 +88,7 @@ def test_insert_tickers_field_values(conn):
 
 
 def test_insert_tickers_null_volume(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     ticker = make_ticker("upbit", "XRP", 1000.0, 1001.0, now, volume=None)
     insert_tickers(conn, [ticker])
 
@@ -108,7 +108,7 @@ def test_insert_tickers_accepts_string_timestamp(conn):
 # --- cleanup_old_data ---
 
 def test_cleanup_removes_old_tickers(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     old_ts = now - timedelta(days=8)   # older than 7-day retention
     recent_ts = now - timedelta(days=1)
 
@@ -126,7 +126,7 @@ def test_cleanup_removes_old_tickers(conn):
 
 
 def test_cleanup_keeps_recent_tickers(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     insert_tickers(conn, [make_ticker("binance", "ADA", 0.5, 0.51, now)])
     cleanup_old_data(conn)
 
@@ -135,7 +135,7 @@ def test_cleanup_keeps_recent_tickers(conn):
 
 
 def test_cleanup_removes_old_opportunities(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     old_ts = (now - timedelta(days=31)).isoformat()
     recent_ts = now.isoformat()
 
@@ -162,7 +162,7 @@ def test_cleanup_removes_old_opportunities(conn):
 # --- get_latest_tickers ---
 
 def test_get_latest_tickers_returns_most_recent(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     older = now - timedelta(seconds=10)
 
     insert_tickers(conn, [
@@ -176,7 +176,7 @@ def test_get_latest_tickers_returns_most_recent(conn):
 
 
 def test_get_latest_tickers_one_per_pair(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     older = now - timedelta(seconds=5)
 
     insert_tickers(conn, [
@@ -193,7 +193,7 @@ def test_get_latest_tickers_one_per_pair(conn):
 
 
 def test_get_latest_tickers_correct_values(conn):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     insert_tickers(conn, [
         make_ticker("binance", "XRP", 0.5, 0.51, now - timedelta(seconds=3)),
         make_ticker("binance", "XRP", 0.6, 0.61, now),

@@ -1,4 +1,4 @@
-"""Async entry point: polling loop that collects exchange data and stores it."""
+"""Entry point: polling loop that collects exchange data and stores it."""
 
 import logging
 import time
@@ -11,6 +11,7 @@ from config.settings import (
     MAX_RETRIES,
     BACKOFF_DELAY,
     DATA_STALE_THRESHOLD,
+    CLEANUP_INTERVAL,
 )
 from storage.db import init_db, insert_tickers, cleanup_old_data
 from collectors.exchange import ExchangeCollector
@@ -21,9 +22,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
 )
 logger = logging.getLogger(__name__)
-
-# Cleanup interval in seconds (24 hours)
-CLEANUP_INTERVAL = 24 * 60 * 60
 
 
 def run_loop():
