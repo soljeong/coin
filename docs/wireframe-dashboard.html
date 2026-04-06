@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Arbitrage Monitor — Wireframe</title>
+<style>
+  /* Intentionally rough — wireframe, not production */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #1a1a2e;
+    color: #c8c8d0;
+    padding: 16px;
+    font-size: 13px;
+  }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #333;
+    padding-bottom: 12px; margin-bottom: 16px;
+  }
+  .header h1 { font-size: 16px; color: #e0e0e0; font-weight: normal; }
+  .status { font-size: 11px; color: #6a6; }
+  .status .dot { display: inline-block; width: 6px; height: 6px; background: #6a6; border-radius: 50%; margin-right: 4px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; margin-bottom: 16px; }
+
+  .panel {
+    border: 1px solid #333;
+    padding: 12px;
+  }
+  .panel-title {
+    font-size: 11px; color: #888; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 10px;
+  }
+
+  /* Opportunity table */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: #666; font-weight: normal; padding: 4px 8px; border-bottom: 1px solid #333; }
+  td { padding: 6px 8px; border-bottom: 1px solid #222; }
+  tr:hover { background: #222; }
+  .profit-pos { color: #4ecdc4; font-weight: bold; }
+  .profit-neg { color: #666; }
+  .path { color: #a0a0b0; font-size: 11px; }
+  .volume { color: #888; }
+  .risk-low { color: #6a6; }
+  .risk-med { color: #cc6; }
+  .risk-high { color: #c66; }
+
+  /* Heatmap */
+  .heatmap { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .heat-cell {
+    padding: 8px 4px; text-align: center; font-size: 10px;
+    border: 1px solid #333;
+  }
+  .heat-cell .symbol { font-weight: bold; margin-bottom: 2px; }
+  .heat-cell .pct { font-size: 11px; }
+  /* Color coding: green = positive premium, red = negative */
+  .heat-pos-3 { background: #0a3a2a; color: #4ecdc4; }
+  .heat-pos-2 { background: #082a1e; color: #3ab; }
+  .heat-pos-1 { background: #061e16; color: #389; }
+  .heat-zero  { background: #1a1a2e; color: #666; }
+  .heat-neg-1 { background: #2a1616; color: #c66; }
+
+  /* Chart placeholder */
+  .chart-area {
+    height: 180px; border: 1px dashed #444;
+    display: flex; align-items: center; justify-content: center;
+    color: #555; font-size: 12px; margin-top: 8px;
+  }
+  .chart-line {
+    height: 180px; position: relative; overflow: hidden;
+  }
+  .chart-line svg { width: 100%; height: 100%; }
+  .chart-line .axis { stroke: #333; }
+  .chart-line .line { stroke: #4ecdc4; fill: none; stroke-width: 1.5; }
+  .chart-line .zero { stroke: #555; stroke-dasharray: 4 4; }
+
+  /* Bottom row */
+  .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* Detail panel */
+  .detail-step {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid #222;
+    font-size: 12px;
+  }
+  .step-num {
+    width: 20px; height: 20px; border: 1px solid #4ecdc4;
+    border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 10px; color: #4ecdc4;
+    flex-shrink: 0;
+  }
+  .step-arrow { color: #444; }
+
+  /* Stats */
+  .stat-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #222; }
+  .stat-label { color: #666; }
+  .stat-value { color: #c8c8d0; }
+
+  /* What-if simulator */
+  .slider-row { margin: 8px 0; }
+  .slider-row label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; }
+  .slider-row input[type="range"] { width: 100%; accent-color: #4ecdc4; }
+  .slider-val { float: right; color: #4ecdc4; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>⟐ Arbitrage Monitor — Upbit × Binance</h1>
+  <div class="status"><span class="dot"></span> LIVE · 3s polling · 87 coins tracked · last update 0.4s ago</div>
+</div>
+
+<!-- MAIN GRID: Opportunities + Heatmap -->
+<div class="grid">
+
+  <!-- Left: Opportunity Table -->
+  <div class="panel">
+    <div class="panel-title">실시간 아비트리지 기회 (Real-time Opportunities)</div>
+    <table>
+      <tr>
+        <th>경로 (Path)</th>
+        <th>순수익률</th>
+        <th>거래량</th>
+        <th>단계</th>
+        <th>리스크</th>
+      </tr>
+      <tr>
+        <td>
+          <div class="path">Binance BTC/USDT → XRP bridge → Upbit BTC/KRW</div>
+        </td>
+        <td class="profit-pos">+1.24%</td>
+        <td class="volume">₩2.3B</td>
+        <td>3</td>
+        <td class="risk-low">LOW</td>
+      </tr>
+      <tr>
+        <td>
+          <div class="path">Upbit ETH/KRW → XLM bridge → Binance ETH/USDT</div>
+        </td>
+        <td class="profit-pos">+0.87%</td>
+        <td class="volume">₩1.8B</td>
+        <td>3</td>
+        <td class="risk-low">LOW</td>
+      </tr>
+      <tr>
+        <td>
+          <div class="path">Binance SOL/USDT → XRP bridge → Upbit SOL/KRW</div>
+        </td>
+        <td class="profit-pos">+0.52%</td>
+        <td class="volume">₩890M</td>
+        <td>3</td>
+        <td class="risk-med">MED</td>
+      </tr>
+      <tr>
+        <td>
+          <div class="path">Upbit ADA/BTC → Binance ADA/USDT → XRP → Upbit</div>
+        </td>
+        <td class="profit-pos">+0.41%</td>
+        <td class="volume">₩450M</td>
+        <td>4</td>
+        <td class="risk-med">MED</td>
+      </tr>
+      <tr>
+        <td>
+          <div class="path">Binance DOGE/USDT → XLM bridge → Upbit DOGE/KRW</div>
+        </td>
+        <td class="profit-neg">+0.12%</td>
+        <td class="volume">₩320M</td>
+        <td>3</td>
+        <td class="risk-high">HIGH</td>
+      </tr>
+      <!-- Comment: Below threshold (0.3%), shown grayed out -->
+      <tr style="opacity: 0.4;">
+        <td>
+          <div class="path">Upbit LINK/KRW → XRP bridge → Binance LINK/USDT</div>
+        </td>
+        <td class="profit-neg">-0.15%</td>
+        <td class="volume">₩210M</td>
+        <td>3</td>
+        <td class="risk-high">HIGH</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Right: Kimchi Premium Heatmap -->
+  <div class="panel">
+    <div class="panel-title">김치 프리미엄 현황 (Kimchi Premium)</div>
+    <div class="heatmap">
+      <div class="heat-cell heat-pos-3"><div class="symbol">BTC</div><div class="pct">+3.2%</div></div>
+      <div class="heat-cell heat-pos-3"><div class="symbol">ETH</div><div class="pct">+2.8%</div></div>
+      <div class="heat-cell heat-pos-2"><div class="symbol">SOL</div><div class="pct">+2.1%</div></div>
+      <div class="heat-cell heat-pos-2"><div class="symbol">XRP</div><div class="pct">+1.9%</div></div>
+      <div class="heat-cell heat-pos-1"><div class="symbol">ADA</div><div class="pct">+1.2%</div></div>
+      <div class="heat-cell heat-pos-1"><div class="symbol">DOGE</div><div class="pct">+0.8%</div></div>
+      <div class="heat-cell heat-zero"><div class="symbol">LINK</div><div class="pct">+0.1%</div></div>
+      <div class="heat-cell heat-neg-1"><div class="symbol">AVAX</div><div class="pct">-0.3%</div></div>
+      <div class="heat-cell heat-pos-2"><div class="symbol">DOT</div><div class="pct">+2.0%</div></div>
+      <div class="heat-cell heat-pos-1"><div class="symbol">MATIC</div><div class="pct">+1.1%</div></div>
+      <div class="heat-cell heat-pos-1"><div class="symbol">ATOM</div><div class="pct">+0.9%</div></div>
+      <div class="heat-cell heat-zero"><div class="symbol">UNI</div><div class="pct">+0.2%</div></div>
+      <div class="heat-cell heat-neg-1"><div class="symbol">APT</div><div class="pct">-0.2%</div></div>
+      <div class="heat-cell heat-pos-1"><div class="symbol">NEAR</div><div class="pct">+0.7%</div></div>
+      <div class="heat-cell heat-zero"><div class="symbol">FIL</div><div class="pct">-0.0%</div></div>
+      <div class="heat-cell heat-pos-2"><div class="symbol">ARB</div><div class="pct">+1.8%</div></div>
+    </div>
+
+    <!-- What-if Simulator (stretch goal from 2nd opinion) -->
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #333;">
+      <div class="panel-title">What-If 시뮬레이터</div>
+      <div class="slider-row">
+        <label>KRW/USD 환율 변동 <span class="slider-val">+0.0%</span></label>
+        <input type="range" min="-5" max="5" value="0" step="0.5">
+      </div>
+      <div class="slider-row">
+        <label>업비트 출금수수료 변동 <span class="slider-val">1x</span></label>
+        <input type="range" min="0.5" max="3" value="1" step="0.25">
+      </div>
+      <div class="slider-row">
+        <label>전송 시간 (분) <span class="slider-val">5 min</span></label>
+        <input type="range" min="1" max="30" value="5" step="1">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM ROW: Spread Chart + Opportunity Detail -->
+<div class="bottom-grid">
+
+  <!-- Bridge Coin Spread Chart -->
+  <div class="panel">
+    <div class="panel-title">XRP 브릿지 스프레드 (24h)</div>
+    <div class="chart-line">
+      <svg viewBox="0 0 500 180">
+        <!-- Zero line -->
+        <line x1="0" y1="90" x2="500" y2="90" class="zero"/>
+        <!-- Axes -->
+        <line x1="0" y1="0" x2="0" y2="180" class="axis"/>
+        <line x1="0" y1="180" x2="500" y2="180" class="axis"/>
+        <!-- Spread line (simulated data showing premium fluctuation) -->
+        <polyline class="line" points="
+          0,70 20,72 40,68 60,75 80,65 100,60 120,55 140,58
+          160,50 180,45 200,48 220,52 240,55 260,50 280,45
+          300,40 320,42 340,38 360,35 380,40 400,45 420,42
+          440,38 460,35 480,32 500,30
+        "/>
+        <!-- Labels -->
+        <text x="5" y="15" fill="#666" font-size="10">+3%</text>
+        <text x="5" y="88" fill="#555" font-size="10">0%</text>
+        <text x="5" y="175" fill="#666" font-size="10">-3%</text>
+        <text x="10" y="175" fill="#444" font-size="9">00:00</text>
+        <text x="240" y="175" fill="#444" font-size="9">12:00</text>
+        <text x="470" y="175" fill="#444" font-size="9">now</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Opportunity Detail -->
+  <div class="panel">
+    <div class="panel-title">기회 상세: Binance BTC → XRP Bridge → Upbit BTC</div>
+
+    <div class="detail-step">
+      <div class="step-num">1</div>
+      <div>Binance: BTC/USDT 매수 @ $67,240 <span style="color:#666">(수수료 0.1%)</span></div>
+    </div>
+    <div class="detail-step">
+      <div class="step-num">2</div>
+      <div>Binance: BTC → XRP 변환 <span style="color:#666">(spread 0.05%)</span></div>
+    </div>
+    <div class="detail-step">
+      <div class="step-num">3</div>
+      <div>XRP 전송: Binance → Upbit <span style="color:#666">(~3분, 수수료 0.25 XRP)</span></div>
+    </div>
+    <div class="detail-step">
+      <div class="step-num">4</div>
+      <div>Upbit: XRP → BTC 변환 → KRW 매도 <span style="color:#666">(수수료 0.05%)</span></div>
+    </div>
+
+    <div style="margin-top: 12px;">
+      <div class="stat-row"><span class="stat-label">총 비용</span><span class="stat-value">0.42%</span></div>
+      <div class="stat-row"><span class="stat-label">김치 프리미엄</span><span class="stat-value">+3.2%</span></div>
+      <div class="stat-row"><span class="stat-label">브릿지 스프레드</span><span class="stat-value">-1.54%</span></div>
+      <div class="stat-row"><span class="stat-label" style="color:#e0e0e0">순수익률 (Net)</span><span class="profit-pos" style="font-size:14px">+1.24%</span></div>
+      <div class="stat-row"><span class="stat-label">예상 소요시간</span><span class="stat-value">~5분</span></div>
+      <div class="stat-row"><span class="stat-label">슬리피지 리스크</span><span class="risk-low">LOW (volume OK)</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Comment: Design decisions:
+  1. Dark theme because crypto dashboards are used at night and financial terminals are traditionally dark.
+  2. Data-dense layout — no wasted space. Every pixel shows information.
+  3. Korean labels with English subtitles — matches the Upbit user demographic.
+  4. Heatmap uses 8-column grid to show ~16 coins at a glance without scrolling.
+  5. What-if simulator uses range sliders for instant feedback loops.
+  6. Step-by-step opportunity detail shows exact fees at each stage — transparency builds trust.
+  7. Grayed-out rows below threshold (0.3%) still visible but clearly deprioritized.
+  8. Status bar shows data freshness — critical for a real-time monitoring tool.
+-->
+
+</body>
+</html>
