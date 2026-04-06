@@ -7,9 +7,19 @@ POLLING_INTERVAL = 3
 # Database path
 DB_PATH = 'data/arbitrage.db'
 
-# Exchange fee rates
+# Exchange fee rates (trading)
 UPBIT_FEE = 0.0005    # 0.05%
 BINANCE_FEE = 0.001   # 0.10%
+
+# Bridge coins for implied KRW/USDT exchange rate
+# These coins have fast, cheap transfers between exchanges
+BRIDGE_COINS = ['XRP', 'XLM']
+
+# Withdrawal fees (in coin units, approximate)
+WITHDRAWAL_FEES = {
+    'XRP': 1.0,      # Binance XRP withdrawal
+    'XLM': 0.1,      # Binance XLM withdrawal
+}
 
 # Data staleness threshold in seconds
 DATA_STALE_THRESHOLD = 15

@@ -15,6 +15,7 @@ from config.settings import (
 )
 from storage.db import init_db, insert_tickers, cleanup_old_data
 from collectors.exchange import ExchangeCollector
+from analysis.spread import calc_spreads
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +57,21 @@ def run_loop():
                         exchanges[ex] = exchanges.get(ex, 0) + 1
                     stats = ", ".join(f"{ex}={cnt}" for ex, cnt in sorted(exchanges.items()))
                     logger.info("Collected %d tickers (%s)", len(tickers), stats)
+
+                    # Calculate spreads
+                    spreads = calc_spreads(tickers)
+                    if spreads:
+                        top = spreads[0]
+                        logger.info(
+                            "Top spread: %s gross=%.2f%% net=%.2f%% (rate=%.0f KRW/USDT)",
+                            top["symbol"], top["gross_premium_pct"],
+                            top["net_spread_pct"], top["implied_rate"],
+                        )
+                        for s in spreads[:5]:
+                            logger.info(
+                                "  %s: gross=%.2f%% net=%.2f%%",
+                                s["symbol"], s["gross_premium_pct"], s["net_spread_pct"],
+                            )
                 else:
                     logger.warning("No tickers collected this cycle")
 
