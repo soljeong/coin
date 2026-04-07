@@ -2,17 +2,16 @@
 
 import asyncio
 import json
-import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from storage.db import get_latest_tickers, get_latest_opportunities, get_opportunity_history
+from storage.db import get_latest_tickers, get_latest_opportunities, get_opportunity_history, get_db_size
 from analysis.spread import calc_spreads, calc_implied_rate, _build_price_map
 from config.settings import (
-    DB_PATH, POLLING_INTERVAL, TARGET_COINS,
+    POLLING_INTERVAL, TARGET_COINS,
     UPBIT_FEE, BINANCE_FEE, WITHDRAWAL_FEES,
 )
 
@@ -56,9 +55,7 @@ async def status(request: Request):
     row = conn.execute("SELECT MAX(timestamp) FROM tickers").fetchone()
     last_update = row[0] if row else None
 
-    db_size_bytes = 0
-    if DB_PATH != ":memory:" and os.path.exists(DB_PATH):
-        db_size_bytes = os.path.getsize(DB_PATH)
+    db_size_bytes = get_db_size(conn)
 
     opp_count = conn.execute(
         "SELECT COUNT(*) FROM opportunities WHERE timestamp >= datetime('now', '-1 hour')"
@@ -112,9 +109,7 @@ async def stream(request: Request):
                     opp_count = conn.execute(
                         "SELECT COUNT(*) FROM opportunities WHERE timestamp >= datetime('now', '-1 hour')"
                     ).fetchone()[0]
-                    db_size = 0
-                    if DB_PATH != ":memory:" and os.path.exists(DB_PATH):
-                        db_size = os.path.getsize(DB_PATH)
+                    db_size = get_db_size(conn)
 
                     status_data = {
                         "status": "running",

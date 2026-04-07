@@ -8,15 +8,13 @@ from fastapi.staticfiles import StaticFiles
 
 from dashboard.api import router
 from storage.db import init_db
-from config.settings import DB_PATH
+from config.settings import DATABASE_URL
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize DB connection on startup."""
-    conn = init_db(DB_PATH)
-    # Enable WAL mode for concurrent reads
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = init_db(DATABASE_URL)
     app.state.db = conn
     yield
     conn.close()

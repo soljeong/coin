@@ -1,58 +1,56 @@
-import sqlite3
-import os
+import psycopg2
+import psycopg2.extras
 from datetime import datetime, timedelta, timezone
 
 from config.settings import RETENTION_DAYS_TICKERS, RETENTION_DAYS_OPPORTUNITIES
 
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS tickers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    exchange TEXT NOT NULL,
-    symbol TEXT NOT NULL,
-    bid_price REAL NOT NULL,
-    ask_price REAL NOT NULL,
-    last_price REAL,
-    volume_24h REAL,
-    timestamp DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+_SCHEMA_SQL = [
+    """
+    CREATE TABLE IF NOT EXISTS tickers (
+        id SERIAL PRIMARY KEY,
+        exchange TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        bid_price DOUBLE PRECISION NOT NULL,
+        ask_price DOUBLE PRECISION NOT NULL,
+        last_price DOUBLE PRECISION,
+        volume_24h DOUBLE PRECISION,
+        timestamp TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_tickers_ts ON tickers(timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_tickers_exchange_symbol ON tickers(exchange, symbol)",
+    """
+    CREATE TABLE IF NOT EXISTS opportunities (
+        id SERIAL PRIMARY KEY,
+        path TEXT NOT NULL,
+        hops INTEGER NOT NULL,
+        gross_spread DOUBLE PRECISION NOT NULL,
+        net_profit DOUBLE PRECISION NOT NULL,
+        total_fees DOUBLE PRECISION NOT NULL,
+        risk_level TEXT NOT NULL,
+        timestamp TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_opportunities_profit ON opportunities(net_profit DESC)",
+]
 
-CREATE TABLE IF NOT EXISTS opportunities (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    path TEXT NOT NULL,
-    hops INTEGER NOT NULL,
-    gross_spread REAL NOT NULL,
-    net_profit REAL NOT NULL,
-    total_fees REAL NOT NULL,
-    risk_level TEXT NOT NULL,
-    timestamp DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
 
-CREATE INDEX IF NOT EXISTS idx_tickers_ts ON tickers(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_tickers_exchange_symbol ON tickers(exchange, symbol);
-CREATE INDEX IF NOT EXISTS idx_opportunities_profit ON opportunities(net_profit DESC);
-"""
-
-
-def init_db(db_path: str) -> sqlite3.Connection:
-    """Create tables if not exist, return connection.
-    Creates the data/ directory if db_path is not :memory:."""
-    if db_path != ":memory:":
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.executescript(_SCHEMA_SQL)
+def init_db(database_url: str) -> psycopg2.extensions.connection:
+    """Create tables if not exist, return connection."""
+    conn = psycopg2.connect(database_url)
+    conn.autocommit = False
+    cur = conn.cursor()
+    for sql in _SCHEMA_SQL:
+        cur.execute(sql)
     conn.commit()
+    cur.close()
     return conn
 
 
-def insert_tickers(conn: sqlite3.Connection, tickers: list) -> None:
-    """Batch insert ticker data.
-
-    Each dict must have: exchange, symbol, bid_price, ask_price, volume_24h, timestamp.
-    """
+def insert_tickers(conn, tickers: list) -> None:
+    """Batch insert ticker data."""
     rows = [
         (
             t["exchange"],
@@ -65,33 +63,35 @@ def insert_tickers(conn: sqlite3.Connection, tickers: list) -> None:
         )
         for t in tickers
     ]
-    conn.executemany(
+    cur = conn.cursor()
+    psycopg2.extras.execute_batch(
+        cur,
         """
         INSERT INTO tickers (exchange, symbol, bid_price, ask_price, last_price, volume_24h, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         rows,
     )
     conn.commit()
+    cur.close()
 
 
-def cleanup_old_data(conn: sqlite3.Connection) -> None:
+def cleanup_old_data(conn) -> None:
     """Delete tickers older than RETENTION_DAYS_TICKERS days and
     opportunities older than RETENTION_DAYS_OPPORTUNITIES days."""
     now = datetime.now(timezone.utc)
     ticker_cutoff = (now - timedelta(days=RETENTION_DAYS_TICKERS)).isoformat()
     opp_cutoff = (now - timedelta(days=RETENTION_DAYS_OPPORTUNITIES)).isoformat()
 
-    conn.execute("DELETE FROM tickers WHERE timestamp < ?", (ticker_cutoff,))
-    conn.execute("DELETE FROM opportunities WHERE timestamp < ?", (opp_cutoff,))
+    cur = conn.cursor()
+    cur.execute("DELETE FROM tickers WHERE timestamp < %s", (ticker_cutoff,))
+    cur.execute("DELETE FROM opportunities WHERE timestamp < %s", (opp_cutoff,))
     conn.commit()
+    cur.close()
 
 
-def insert_opportunities(conn: sqlite3.Connection, opportunities: list) -> None:
-    """Batch insert arbitrage opportunities.
-
-    Each dict must have: path, hops, gross_spread, net_profit, total_fees, risk_level, timestamp.
-    """
+def insert_opportunities(conn, opportunities: list) -> None:
+    """Batch insert arbitrage opportunities."""
     rows = [
         (
             o["path"],
@@ -104,58 +104,71 @@ def insert_opportunities(conn: sqlite3.Connection, opportunities: list) -> None:
         )
         for o in opportunities
     ]
-    conn.executemany(
+    cur = conn.cursor()
+    psycopg2.extras.execute_batch(
+        cur,
         """
         INSERT INTO opportunities (path, hops, gross_spread, net_profit, total_fees, risk_level, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         rows,
     )
     conn.commit()
+    cur.close()
 
 
-def get_latest_opportunities(conn: sqlite3.Connection, limit: int = 20) -> list:
+def get_latest_opportunities(conn, limit: int = 20) -> list:
     """Return most recent opportunities sorted by net_profit descending."""
-    cursor = conn.execute(
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
         """
         SELECT * FROM opportunities
-        WHERE timestamp >= datetime('now', '-1 hour')
+        WHERE timestamp >= NOW() - INTERVAL '1 hour'
         ORDER BY net_profit DESC
-        LIMIT ?
+        LIMIT %s
         """,
         (limit,),
     )
-    return [dict(row) for row in cursor.fetchall()]
+    rows = cur.fetchall()
+    cur.close()
+    return [dict(row) for row in rows]
 
 
-def get_opportunity_history(conn: sqlite3.Connection, hours: int = 24) -> list:
+def get_opportunity_history(conn, hours: int = 24) -> list:
     """Return opportunity history for the last N hours."""
-    cursor = conn.execute(
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
         """
         SELECT * FROM opportunities
-        WHERE timestamp >= datetime('now', ? || ' hours')
+        WHERE timestamp >= NOW() - make_interval(hours := %s)
         ORDER BY timestamp DESC
         """,
-        (f"-{hours}",),
+        (hours,),
     )
-    return [dict(row) for row in cursor.fetchall()]
+    rows = cur.fetchall()
+    cur.close()
+    return [dict(row) for row in rows]
 
 
-def get_latest_tickers(conn: sqlite3.Connection) -> list:
+def get_latest_tickers(conn) -> list:
     """Return the most recent ticker for each (exchange, symbol) pair."""
-    cursor = conn.execute(
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
         """
-        SELECT t.*
-        FROM tickers t
-        INNER JOIN (
-            SELECT exchange, symbol, MAX(timestamp) AS max_ts
-            FROM tickers
-            GROUP BY exchange, symbol
-        ) latest
-        ON t.exchange = latest.exchange
-           AND t.symbol = latest.symbol
-           AND t.timestamp = latest.max_ts
-        ORDER BY t.exchange, t.symbol
+        SELECT DISTINCT ON (exchange, symbol) *
+        FROM tickers
+        ORDER BY exchange, symbol, timestamp DESC
         """
     )
-    return [dict(row) for row in cursor.fetchall()]
+    rows = cur.fetchall()
+    cur.close()
+    return [dict(row) for row in rows]
+
+
+def get_db_size(conn) -> int:
+    """Return database size in bytes."""
+    cur = conn.cursor()
+    cur.execute("SELECT pg_database_size(current_database())")
+    size = cur.fetchone()[0]
+    cur.close()
+    return size

@@ -1,11 +1,13 @@
+import os
+
 # Target coins for arbitrage monitoring
 TARGET_COINS = ['BTC', 'ETH', 'XRP', 'SOL', 'ADA', 'DOGE', 'LINK', 'DOT', 'AVAX', 'POL']
 
 # Polling interval in seconds
 POLLING_INTERVAL = 3
 
-# Database path
-DB_PATH = 'data/arbitrage.db'
+# Database
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://arb:arb@localhost:5432/arbitrage')
 
 # Exchange fee rates (trading)
 UPBIT_FEE = 0.0005    # 0.05%

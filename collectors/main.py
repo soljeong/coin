@@ -1,4 +1,4 @@
-"""Entry point: polling loop that collects exchange data, analyzes, and serves dashboard."""
+"""Standalone collector entrypoint for Docker container."""
 
 import logging
 import time

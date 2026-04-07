@@ -1,8 +1,19 @@
-"""Tests for storage/db.py using in-memory SQLite."""
+"""Tests for storage/db.py using PostgreSQL.
+
+Requires a running PostgreSQL instance. Set TEST_DATABASE_URL env var
+or defaults to postgresql://arb:arb@localhost:5432/arbitrage_test.
+"""
+import os
 import pytest
 from datetime import datetime, timedelta, timezone
 
 from storage.db import init_db, insert_tickers, cleanup_old_data, get_latest_tickers
+
+
+TEST_DATABASE_URL = os.environ.get(
+    'TEST_DATABASE_URL',
+    'postgresql://arb:arb@localhost:5432/arbitrage_test',
+)
 
 
 def make_ticker(exchange, symbol, bid, ask, ts, volume=None):
@@ -18,34 +29,46 @@ def make_ticker(exchange, symbol, bid, ask, ts, volume=None):
 
 @pytest.fixture
 def conn():
-    c = init_db(":memory:")
+    c = init_db(TEST_DATABASE_URL)
     yield c
+    # Clean up tables after each test
+    cur = c.cursor()
+    cur.execute("DELETE FROM tickers")
+    cur.execute("DELETE FROM opportunities")
+    c.commit()
+    cur.close()
     c.close()
 
 
 # --- init_db ---
 
 def test_init_db_creates_tickers_table(conn):
-    result = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='tickers'"
-    ).fetchone()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT tablename FROM pg_tables WHERE tablename = 'tickers'"
+    )
+    result = cur.fetchone()
+    cur.close()
     assert result is not None
 
 
 def test_init_db_creates_opportunities_table(conn):
-    result = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='opportunities'"
-    ).fetchone()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT tablename FROM pg_tables WHERE tablename = 'opportunities'"
+    )
+    result = cur.fetchone()
+    cur.close()
     assert result is not None
 
 
 def test_init_db_creates_indexes(conn):
-    indexes = {
-        row[0]
-        for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index'"
-        ).fetchall()
-    }
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT indexname FROM pg_indexes WHERE tablename IN ('tickers', 'opportunities')"
+    )
+    indexes = {row[0] for row in cur.fetchall()}
+    cur.close()
     assert "idx_tickers_ts" in indexes
     assert "idx_tickers_exchange_symbol" in indexes
     assert "idx_opportunities_profit" in indexes
@@ -53,10 +76,9 @@ def test_init_db_creates_indexes(conn):
 
 def test_init_db_idempotent():
     """Calling init_db twice should not raise."""
-    c = init_db(":memory:")
+    c = init_db(TEST_DATABASE_URL)
     c.close()
-    # second call on same path (new in-memory DB — just verifying no exception)
-    c2 = init_db(":memory:")
+    c2 = init_db(TEST_DATABASE_URL)
     c2.close()
 
 
@@ -70,7 +92,10 @@ def test_insert_tickers_stores_data(conn):
     ]
     insert_tickers(conn, tickers)
 
-    rows = conn.execute("SELECT * FROM tickers").fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM tickers")
+    rows = cur.fetchall()
+    cur.close()
     assert len(rows) == 2
 
 
@@ -79,7 +104,11 @@ def test_insert_tickers_field_values(conn):
     ticker = make_ticker("upbit", "ETH", 5_000_000.0, 5_010_000.0, now, volume=999.9)
     insert_tickers(conn, [ticker])
 
-    row = dict(conn.execute("SELECT * FROM tickers WHERE symbol='ETH'").fetchone())
+    import psycopg2.extras
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM tickers WHERE symbol='ETH'")
+    row = dict(cur.fetchone())
+    cur.close()
     assert row["exchange"] == "upbit"
     assert row["symbol"] == "ETH"
     assert row["bid_price"] == 5_000_000.0
@@ -92,7 +121,11 @@ def test_insert_tickers_null_volume(conn):
     ticker = make_ticker("upbit", "XRP", 1000.0, 1001.0, now, volume=None)
     insert_tickers(conn, [ticker])
 
-    row = dict(conn.execute("SELECT * FROM tickers WHERE symbol='XRP'").fetchone())
+    import psycopg2.extras
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM tickers WHERE symbol='XRP'")
+    row = dict(cur.fetchone())
+    cur.close()
     assert row["volume_24h"] is None
 
 
@@ -101,7 +134,10 @@ def test_insert_tickers_accepts_string_timestamp(conn):
     ticker = make_ticker("binance", "SOL", 200.0, 200.5, ts_str)
     insert_tickers(conn, [ticker])
 
-    row = conn.execute("SELECT * FROM tickers WHERE symbol='SOL'").fetchone()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM tickers WHERE symbol='SOL'")
+    row = cur.fetchone()
+    cur.close()
     assert row is not None
 
 
@@ -109,7 +145,7 @@ def test_insert_tickers_accepts_string_timestamp(conn):
 
 def test_cleanup_removes_old_tickers(conn):
     now = datetime.now(timezone.utc)
-    old_ts = now - timedelta(days=8)   # older than 7-day retention
+    old_ts = now - timedelta(days=8)
     recent_ts = now - timedelta(days=1)
 
     insert_tickers(conn, [
@@ -119,8 +155,10 @@ def test_cleanup_removes_old_tickers(conn):
 
     cleanup_old_data(conn)
 
-    rows = conn.execute("SELECT symbol FROM tickers").fetchall()
-    symbols = [r[0] for r in rows]
+    cur = conn.cursor()
+    cur.execute("SELECT symbol FROM tickers")
+    symbols = [r[0] for r in cur.fetchall()]
+    cur.close()
     assert "BTC" not in symbols
     assert "ETH" in symbols
 
@@ -130,7 +168,10 @@ def test_cleanup_keeps_recent_tickers(conn):
     insert_tickers(conn, [make_ticker("binance", "ADA", 0.5, 0.51, now)])
     cleanup_old_data(conn)
 
-    count = conn.execute("SELECT COUNT(*) FROM tickers").fetchone()[0]
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM tickers")
+    count = cur.fetchone()[0]
+    cur.close()
     assert count == 1
 
 
@@ -139,24 +180,28 @@ def test_cleanup_removes_old_opportunities(conn):
     old_ts = (now - timedelta(days=31)).isoformat()
     recent_ts = now.isoformat()
 
-    conn.execute(
+    cur = conn.cursor()
+    cur.execute(
         "INSERT INTO opportunities (path, hops, gross_spread, net_profit, total_fees, risk_level, timestamp) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ('["binance:BTC","upbit:BTC"]', 2, 1.5, 0.8, 0.7, "LOW", old_ts),
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        ('[\"binance:BTC\",\"upbit:BTC\"]', 2, 1.5, 0.8, 0.7, "LOW", old_ts),
     )
-    conn.execute(
+    cur.execute(
         "INSERT INTO opportunities (path, hops, gross_spread, net_profit, total_fees, risk_level, timestamp) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ('["binance:ETH","upbit:ETH"]', 2, 2.0, 1.2, 0.8, "MED", recent_ts),
+        "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        ('[\"binance:ETH\",\"upbit:ETH\"]', 2, 2.0, 1.2, 0.8, "MED", recent_ts),
     )
     conn.commit()
+    cur.close()
 
     cleanup_old_data(conn)
 
-    rows = conn.execute("SELECT path FROM opportunities").fetchall()
-    paths = [r[0] for r in rows]
-    assert '["binance:BTC","upbit:BTC"]' not in paths
-    assert '["binance:ETH","upbit:ETH"]' in paths
+    cur = conn.cursor()
+    cur.execute("SELECT path FROM opportunities")
+    paths = [r[0] for r in cur.fetchall()]
+    cur.close()
+    assert '[\"binance:BTC\",\"upbit:BTC\"]' not in paths
+    assert '[\"binance:ETH\",\"upbit:ETH\"]' in paths
 
 
 # --- get_latest_tickers ---
@@ -167,7 +212,7 @@ def test_get_latest_tickers_returns_most_recent(conn):
 
     insert_tickers(conn, [
         make_ticker("upbit", "BTC", 100.0, 101.0, older),
-        make_ticker("upbit", "BTC", 200.0, 201.0, now),   # newer — should win
+        make_ticker("upbit", "BTC", 200.0, 201.0, now),
     ])
 
     result = get_latest_tickers(conn)
@@ -188,7 +233,6 @@ def test_get_latest_tickers_one_per_pair(conn):
     ])
 
     result = get_latest_tickers(conn)
-    # 3 unique (exchange, symbol) pairs
     assert len(result) == 3
 
 
