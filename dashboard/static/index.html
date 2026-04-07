@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arbitrage Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">Arbitrage Monitor</div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" data-tab="opportunities">
+        <span class="dot"></span> 기회
+      </div>
+      <div class="nav-item" data-tab="premium">
+        <span class="dot"></span> 프리미엄
+      </div>
+      <div class="nav-item" data-tab="history">
+        <span class="dot"></span> 이력
+      </div>
+      <div class="nav-item" data-tab="whatif">
+        <span class="dot"></span> What-If
+      </div>
+    </div>
+    <div class="sidebar-status">
+      <div id="connection-status">
+        <span class="status-dot online" id="status-dot"></span>
+        <span id="status-text">연결됨</span>
+      </div>
+      <div style="margin-top: 4px;" id="last-update">마지막 갱신: --:--:--</div>
+    </div>
+  </nav>
+
+  <!-- Main content -->
+  <main class="main">
+    <!-- Tab 1: Opportunities -->
+    <div id="tab-opportunities" class="tab-content active">
+      <div class="header">
+        <h1>실시간 기회</h1>
+        <div class="header-meta" id="opp-count">기회 0개</div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>경로</th>
+              <th>Hops</th>
+              <th>순수익률</th>
+              <th>총수익률</th>
+              <th>수수료</th>
+              <th>리스크</th>
+            </tr>
+          </thead>
+          <tbody id="opp-table-body">
+          </tbody>
+        </table>
+        <div class="empty-state" id="opp-empty">
+          <h3>현재 수익 기회가 없습니다</h3>
+          <p>데이터 수집 중... 잠시 후 기회가 표시됩니다.</p>
+        </div>
+      </div>
+
+      <!-- Detail panel -->
+      <div class="detail-panel" id="opp-detail">
+        <div class="card-title">경로 상세</div>
+        <div class="detail-path" id="detail-path"></div>
+        <div class="detail-stats" id="detail-stats"></div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Kimchi Premium Heatmap -->
+    <div id="tab-premium" class="tab-content">
+      <div class="header">
+        <h1>김치 프리미엄</h1>
+        <div class="header-meta" id="rate-display">환율: -- KRW/USDT</div>
+      </div>
+
+      <div class="heatmap-grid" id="heatmap-grid">
+      </div>
+    </div>
+
+    <!-- Tab 3: History -->
+    <div id="tab-history" class="tab-content">
+      <div class="header">
+        <h1>이력/통계</h1>
+        <div class="header-meta">최근 24시간</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">기회 이력</div>
+        <div class="chart-container">
+          <canvas id="history-chart"></canvas>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>시각</th>
+              <th>경로</th>
+              <th>순수익률</th>
+              <th>리스크</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 4: What-If Simulator -->
+    <div id="tab-whatif" class="tab-content">
+      <div class="header">
+        <h1>What-If 시뮬레이터</h1>
+        <div class="header-meta">바이낸스 매수 → 업비트 매도 시뮬레이션</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">시뮬레이션 설정</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div>
+            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">
+              투자금액 (KRW) <span id="amount-display" style="color: var(--text-primary); font-family: 'Geist Mono', monospace;">1,000,000</span>
+            </label>
+            <input type="range" id="whatif-amount" min="100000" max="100000000" step="100000" value="1000000"
+              style="width: 100%; accent-color: var(--accent);">
+          </div>
+          <div>
+            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">
+              수수료 오버라이드 (%) <span id="fee-display" style="color: var(--text-primary); font-family: 'Geist Mono', monospace;">기본값</span>
+            </label>
+            <input type="range" id="whatif-fee" min="0" max="1" step="0.01" value=""
+              style="width: 100%; accent-color: var(--accent);">
+          </div>
+          <div>
+            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">
+              슬리피지 (%) <span id="slippage-display" style="color: var(--text-primary); font-family: 'Geist Mono', monospace;">0.10%</span>
+            </label>
+            <input type="range" id="whatif-slippage" min="0" max="2" step="0.05" value="0.1"
+              style="width: 100%; accent-color: var(--accent);">
+          </div>
+        </div>
+        <button id="whatif-run" onclick="runWhatIf()"
+          style="background: var(--accent); color: #0B0E11; border: none; padding: 8px 24px; border-radius: 4px; font-weight: 600; font-size: 13px; cursor: pointer;">
+          시뮬레이션 실행
+        </button>
+      </div>
+
+      <div class="card" style="margin-top: 8px;" id="whatif-results">
+        <div class="empty-state">
+          <h3>설정을 조정하고 시뮬레이션을 실행하세요</h3>
+          <p>현재 시세 기준으로 코인별 예상 수익을 계산합니다.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>폴링 <span id="footer-interval">3</span>초</span>
+    <span>코인 <span id="footer-coins">0</span>개</span>
+    <span>DB <span id="footer-db-size">0</span></span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

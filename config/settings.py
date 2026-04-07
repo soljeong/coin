@@ -21,6 +21,11 @@ WITHDRAWAL_FEES = {
     'XLM': 0.1,      # Binance XLM withdrawal
 }
 
+# Graph engine settings
+MAX_HOPS = 5                    # Maximum path depth for cycle detection
+MIN_NET_PROFIT_PCT = 0.3        # Minimum net profit % to report
+VOLUME_MIN_THRESHOLD = 10000    # Minimum 24h volume (USD) — for future filtering
+
 # Data staleness threshold in seconds
 DATA_STALE_THRESHOLD = 15
 
@@ -39,3 +44,7 @@ RETENTION_DAYS_OPPORTUNITIES = 30
 
 # Cleanup interval in seconds (24 hours)
 CLEANUP_INTERVAL = 24 * 60 * 60
+
+# Dashboard
+DASHBOARD_HOST = '0.0.0.0'
+DASHBOARD_PORT = 8000
