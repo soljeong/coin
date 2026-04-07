@@ -87,6 +87,60 @@ def cleanup_old_data(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def insert_opportunities(conn: sqlite3.Connection, opportunities: list) -> None:
+    """Batch insert arbitrage opportunities.
+
+    Each dict must have: path, hops, gross_spread, net_profit, total_fees, risk_level, timestamp.
+    """
+    rows = [
+        (
+            o["path"],
+            o["hops"],
+            o["gross_spread"],
+            o["net_profit"],
+            o["total_fees"],
+            o["risk_level"],
+            o["timestamp"].isoformat() if isinstance(o["timestamp"], datetime) else o["timestamp"],
+        )
+        for o in opportunities
+    ]
+    conn.executemany(
+        """
+        INSERT INTO opportunities (path, hops, gross_spread, net_profit, total_fees, risk_level, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
+    conn.commit()
+
+
+def get_latest_opportunities(conn: sqlite3.Connection, limit: int = 20) -> list:
+    """Return most recent opportunities sorted by net_profit descending."""
+    cursor = conn.execute(
+        """
+        SELECT * FROM opportunities
+        WHERE timestamp >= datetime('now', '-1 hour')
+        ORDER BY net_profit DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    return [dict(row) for row in cursor.fetchall()]
+
+
+def get_opportunity_history(conn: sqlite3.Connection, hours: int = 24) -> list:
+    """Return opportunity history for the last N hours."""
+    cursor = conn.execute(
+        """
+        SELECT * FROM opportunities
+        WHERE timestamp >= datetime('now', ? || ' hours')
+        ORDER BY timestamp DESC
+        """,
+        (f"-{hours}",),
+    )
+    return [dict(row) for row in cursor.fetchall()]
+
+
 def get_latest_tickers(conn: sqlite3.Connection) -> list:
     """Return the most recent ticker for each (exchange, symbol) pair."""
     cursor = conn.execute(

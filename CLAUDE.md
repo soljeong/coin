@@ -75,9 +75,9 @@ ccxt Collector → SQLite → Graph Engine (벨만-포드) → FastAPI 대시보
 - [x] Day 0: ccxt 검증 게이트 (GO)
 - [x] Day 1: 수집기 + SQLite 저장 (branch: feat/day1-collector-storage)
 - [x] Day 2: 브릿지 코인 스프레드 계산기 (branch: feat/day1-collector-storage)
-- [ ] Day 3: 그래프 엔진 (벨만-포드 사이클 탐지)
-- [ ] Day 4: FastAPI 대시보드
-- [ ] Day 5: SSE 실시간 + What-If 시뮬레이터
+- [x] Day 3: 그래프 엔진 (벨만-포드 사이클 탐지)
+- [x] Day 4: FastAPI 대시보드
+- [x] Day 5: SSE 실시간 + What-If 시뮬레이터
 
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.

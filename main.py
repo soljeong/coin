@@ -1,8 +1,12 @@
-"""Entry point: polling loop that collects exchange data and stores it."""
+"""Entry point: polling loop that collects exchange data, analyzes, and serves dashboard."""
 
 import logging
+import os
+import threading
 import time
 from datetime import datetime, timezone
+
+import uvicorn
 
 from config.settings import (
     POLLING_INTERVAL,
@@ -12,10 +16,13 @@ from config.settings import (
     BACKOFF_DELAY,
     DATA_STALE_THRESHOLD,
     CLEANUP_INTERVAL,
+    DASHBOARD_HOST,
+    DASHBOARD_PORT,
 )
-from storage.db import init_db, insert_tickers, cleanup_old_data
+from storage.db import init_db, insert_tickers, insert_opportunities, cleanup_old_data
 from collectors.exchange import ExchangeCollector
 from analysis.spread import calc_spreads
+from analysis.graph import detect_opportunities
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +79,16 @@ def run_loop():
                                 "  %s: gross=%.2f%% net=%.2f%%",
                                 s["symbol"], s["gross_premium_pct"], s["net_spread_pct"],
                             )
+
+                    # Detect arbitrage opportunities via graph engine
+                    opportunities = detect_opportunities(tickers)
+                    if opportunities:
+                        insert_opportunities(conn, opportunities)
+                        logger.info(
+                            "Stored %d opportunities (best: %.2f%%)",
+                            len(opportunities),
+                            opportunities[0]["net_profit"] if isinstance(opportunities[0]["net_profit"], (int, float)) else 0,
+                        )
                 else:
                     logger.warning("No tickers collected this cycle")
 
@@ -115,5 +132,17 @@ def run_loop():
         conn.close()
 
 
+def run_dashboard():
+    """Start the FastAPI dashboard server."""
+    from dashboard.app import app
+    logger.info("Starting dashboard at http://%s:%d", DASHBOARD_HOST, DASHBOARD_PORT)
+    uvicorn.run(app, host=DASHBOARD_HOST, port=DASHBOARD_PORT, log_level="warning")
+
+
 if __name__ == "__main__":
+    # Start dashboard in background thread
+    dashboard_thread = threading.Thread(target=run_dashboard, daemon=True)
+    dashboard_thread.start()
+
+    # Run collector loop in main thread
     run_loop()
