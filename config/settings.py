@@ -1,7 +1,7 @@
 import os
 
 # Target coins for arbitrage monitoring
-TARGET_COINS = ['BTC', 'ETH', 'XRP', 'SOL', 'ADA', 'DOGE', 'LINK', 'DOT', 'AVAX', 'POL']
+TARGET_COINS = ['BTC', 'ETH', 'XRP', 'XLM', 'SOL', 'ADA', 'DOGE', 'LINK', 'DOT', 'AVAX', 'POL']
 
 # Polling interval in seconds
 POLLING_INTERVAL = 3
